@@ -6,6 +6,7 @@
 typedef unsigned int        UInt;
 typedef unsigned long int   UInt64;
 typedef int                 Int;
+typedef unsigned char       UInt8;
 
 /* Take a graph in edgelist format
  * count how many vertices are not there
@@ -16,12 +17,13 @@ void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
 {
     FILE *fp;
     int fromnode = 0, tonode = 0;
-
     int number_edges = 0;
     int number_nodes = 0;
 
     int num_edges = 0;
     int num_nodes = 0;
+
+    UInt8 zeroNodeExists = 0;
 
     if ((fp = fopen(filename,"r")) == NULL)
     {
@@ -74,11 +76,20 @@ void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
         {
             number_nodes = (tonode > number_nodes) ? tonode : number_nodes;
         }
+
+        if ((0 == zeroNodeExists) && (0 == fromnode || 0 == tonode))
+        {
+          zeroNodeExists = 1;
+        }
     }
 
     /* As nodeID is 0-based, number of nodes needs adjustment */
     //TODO This need to be verified as all the graphs are not zero based
-    number_nodes++;
+    if (zeroNodeExists)
+    {
+      fprintf(fp_outputFile, "Graph has vertexID 0!!!\n");
+      number_nodes++;
+    }
 
     if (number_edges != num_edges)
     {
