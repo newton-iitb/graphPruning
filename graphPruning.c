@@ -34,6 +34,8 @@ class Graph {
 	// unconnected Vertices
 	vector<int> unconnectedVertices;
 
+	int numUnconnectedVertices;
+
 	bool* visited;
 
 	int *newIDarray;
@@ -132,7 +134,7 @@ int addEdgesToGraph(Graph *g, const char *filename, UInt64 *pNumNodes,
 int Graph::accountForUnconnectedVertices(int smallestNodeID)
 {
   /* Find the number of unconnected vertices */
-  int numUnconnectedVertices = countUnReachableVertices(smallestNodeID);
+  numUnconnectedVertices = countUnReachableVertices(smallestNodeID);
   cout << "smallestNodeID: " << smallestNodeID << " Unconnected Nodes: "\
 << numUnconnectedVertices << "\n";
 
@@ -166,6 +168,7 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
     int fromnode = 0, tonode = 0;
     int newFromnode = 0;
     int newTonode = 0;
+    UInt edge = 0;
 
     UInt8 zeroNodeExists = 0;
 
@@ -176,6 +179,7 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
     }
 
     fp_modifiedFile = fopen("modifiedGraph.txt","w");
+    fprintf(fp_modifiedFile, "%s%d\n", "#", V - numUnconnectedVertices);
 
     char str[500];
     while(NULL != fgets(str, 500-1, fp))
@@ -192,8 +196,15 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
         newTonode   = newIDarray[tonode];
 
         if ((-1 != newFromnode) && (-1 != newTonode))
-        fprintf(fp_modifiedFile, "%d %d\n", newFromnode, newTonode);
+        {
+          fprintf(fp_modifiedFile, "%d %d\n", newFromnode, newTonode);
+          edge++;
+        }
     }
+
+    //fseek(fp_modifiedFile, 0, SEEK_SET);
+    //fprintf(fp_modifiedFile, "%s%d %d\n", "#", V - numUnconnectedVertices, edge);
+    fclose(fp_modifiedFile);
 }
 
 /* Take a graph in edgelist format
