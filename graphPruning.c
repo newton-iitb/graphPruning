@@ -178,19 +178,29 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
         exit(1);
     }
 
-    fp_modifiedFile = fopen("modifiedGraph.txt","w");
-    fprintf(fp_modifiedFile, "%s%d\n", "#", V - numUnconnectedVertices);
 
     char str[500];
+
+    /* read the file to find the number of edges */
     while(NULL != fgets(str, 500-1, fp))
     {
-        /* some graphs have their node information wrongly written e.g.
-         * in Wiki-Vote.txt, the number of nodes mentioned is 7115, but there
-         * is a node with entry 7478 and there are other nodes also, so its
-         * better to find the number of nodes and edges in the file by parsing
-         * its once.
-         * The nodeID starts from zero, so number of nodes need adjustment.
-         */
+        sscanf(str,"%d%d", &fromnode, &tonode);
+
+        if ((-1 != newFromnode) && (-1 != newTonode))
+        {
+          edge++;
+        }
+    }
+
+    /* restart reading the file, now we will write the modified file */
+    fseek(fp, 0, SEEK_SET);
+
+    fp_modifiedFile = fopen("modifiedGraph.txt","w");
+    fprintf(fp_modifiedFile, "%s%d %d\n",
+           "#", V- numUnconnectedVertices, edge);
+
+    while(NULL != fgets(str, 500-1, fp))
+    {
         sscanf(str,"%d%d", &fromnode, &tonode);
         newFromnode = newIDarray[fromnode];
         newTonode   = newIDarray[tonode];
@@ -198,12 +208,9 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
         if ((-1 != newFromnode) && (-1 != newTonode))
         {
           fprintf(fp_modifiedFile, "%d %d\n", newFromnode, newTonode);
-          edge++;
         }
     }
 
-    //fseek(fp_modifiedFile, 0, SEEK_SET);
-    //fprintf(fp_modifiedFile, "%s%d %d\n", "#", V - numUnconnectedVertices, edge);
     fclose(fp_modifiedFile);
 }
 
