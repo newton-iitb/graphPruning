@@ -8,6 +8,8 @@
  * https://www.geeksforgeeks.org/count-number-non-reachable-nodes/ */
 #include <iostream>
 #include <list>
+#include <vector>
+
 using namespace std;
 
 // Graph class represents a directed graph
@@ -20,7 +22,14 @@ class Graph {
 	list<int>* adj;
 
 	// A recursive function used by DFS
-	void DFSUtil(int v, bool visited[]);
+	void DFSUtil(int v);
+
+	// Pointer to an array containing
+	// unconnected Vertices
+	vector<int> unconnectedVertices;
+
+	bool* visited;
+
 
 public:
 	Graph(int V); // Constructor
@@ -30,13 +39,16 @@ public:
 
 	// DFS traversal of the vertices
 	// reachable from v
-	int countNotReach(int v);
+	int countUnReachableVertices(int v);
+
+	int accountForUnconnectedVertices(int v);
 };
 
 Graph::Graph(int V)
 {
 	this->V = V;
 	adj = new list<int>[V];
+	visited = new bool[V];
 }
 
 void Graph::addEdge(int v, int w)
@@ -45,7 +57,7 @@ void Graph::addEdge(int v, int w)
 	adj[w].push_back(v); // Add v to w's list.
 }
 
-void Graph::DFSUtil(int v, bool visited[])
+void Graph::DFSUtil(int v)
 {
 	// Mark the current node as visited and
 	// print it
@@ -56,33 +68,35 @@ void Graph::DFSUtil(int v, bool visited[])
 	list<int>::iterator i;
 	for (i = adj[v].begin(); i != adj[v].end(); ++i)
 		if (!visited[*i])
-			DFSUtil(*i, visited);
+			DFSUtil(*i);
 }
 
 // Returns count of not reachable nodes from
 // vertex v.
 // It uses recursive DFSUtil()
-int Graph::countNotReach(int v)
+int Graph::countUnReachableVertices(int v)
 {
 	// Mark all the vertices as not visited
-	bool* visited = new bool[V];
 	for (int i = 0; i < V; i++)
 		visited[i] = false;
 
 	// Call the recursive helper function
 	// to print DFS traversal
-	DFSUtil(v, visited);
+	DFSUtil(v);
 
 	// Return count of not visited nodes
 	int count = 0;
+  cout << "Unconnected Vertices to vertex: " << v << "\n";
 	for (int i = 0; i < V; i++) {
 		if (visited[i] == false)
 		{
-		  cout << "unconnected vertex: " << i << "\n";
 		  count++;
+		  cout << count << ":" << i << ", ";
+		  unconnectedVertices.push_back(i);
 		}
 	}
 
+  cout << "\n";
 	return count;
 }
 /* Taken from GeeksForGeeks END */
@@ -101,7 +115,8 @@ void traverseGraph(const char *filename,
                    UInt64 *pNumEdges,
                    FILE *fp_outputFile,
                    UInt8 addEdge,
-                   Graph *g)
+                   Graph *g,
+                   UInt *pSmallestVertexID)
 {
     FILE *fp;
     int fromnode = 0, tonode = 0;
@@ -115,6 +130,9 @@ void traverseGraph(const char *filename,
         fprintf(stderr,"[Error] Cannot open the file:%s\n", filename);
         exit(1);
     }
+
+    /* init to 0 */
+    *pSmallestVertexID = 0;
 
     char str[500];
     while(NULL != fgets(str, 500-1, fp))
@@ -137,10 +155,32 @@ void traverseGraph(const char *filename,
         if (fromnode >= tonode)
         {
             number_nodes = (fromnode > number_nodes) ? fromnode : number_nodes;
+
+            if (0 == *pSmallestVertexID)
+            {
+              *pSmallestVertexID = tonode;
+            }
+
+            /* Update the smallest vertex ID */
+            if (*pSmallestVertexID > tonode)
+            {
+              *pSmallestVertexID = tonode;
+            }
         }
         else
         {
             number_nodes = (tonode > number_nodes) ? tonode : number_nodes;
+
+            if (0 == *pSmallestVertexID)
+            {
+              *pSmallestVertexID = fromnode;
+            }
+
+            /* Update the smallest vertex ID */
+            if (*pSmallestVertexID > fromnode)
+            {
+              *pSmallestVertexID = fromnode;
+            }
         }
 
         if ((0 == zeroNodeExists) && (0 == fromnode || 0 == tonode))
@@ -164,7 +204,8 @@ void traverseGraph(const char *filename,
 }
 
 void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
-                                     UInt64 *pNumEdges, FILE *fp_outputFile)
+                                     UInt64 *pNumEdges, FILE *fp_outputFile,
+                                     UInt *pSmallestVertexID)
 {
     FILE *fp = NULL;
     int num_edges = 0;
@@ -202,7 +243,8 @@ void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
 
     ungetc(ch, fp);
 
-    traverseGraph(filename, pNumNodes, pNumEdges, fp_outputFile, 0, NULL);
+    traverseGraph(filename, pNumNodes, pNumEdges, fp_outputFile,
+                  0, NULL, pSmallestVertexID);
 
     number_nodes = *pNumNodes;
     number_edges = *pNumEdges;
@@ -237,15 +279,50 @@ int addEdgesToGraph(Graph *g, const char *filename, UInt64 *pNumNodes,
                     UInt64 *pNumEdges, FILE *fp_outputFile)
 {
   UInt64 numNodes = 0, numEdges = 0;
-  traverseGraph(filename, &numNodes, &numEdges, fp_outputFile, 1, g);
+  UInt   smallestNodeID;
+  traverseGraph(filename, &numNodes, &numEdges, fp_outputFile, 1, g, &smallestNodeID);
+}
+
+/* The aim is to form another graph which has only connected vertices of the graph */
+int Graph::accountForUnconnectedVertices(int smallestNodeID)
+{
+  /* Find the number of unconnected vertices */
+  int numUnconnectedVertices = countUnReachableVertices(smallestNodeID);
+  cout << "smallestNodeID: " << smallestNodeID << " Unconnected Nodes: "\
+<< numUnconnectedVertices << "\n";
+
+  int *newIDarray = new int[V];
+
+  int unconnected = -1;
+  for (int i = 0; i < V; i++)
+  {
+	  if (visited[i] == true)
+	  {
+      //printf("vertexID old:%d new:%d unconnected:%d\n", i, i - unconnected, unconnected);
+      newIDarray[i] = i - unconnected;
+	  }
+	  else
+	  {
+	    unconnected++;
+
+	    /* for unconnected vertex, ID is -1 */
+	    newIDarray[i] = -1;
+	  }
+	}
+
+  for (int i = 0; i < V; i++)
+  {
+	  printf("oldID:%d newID:%d\n", i, newIDarray[i]);
+  }
 }
 
 int main(void)
 {
-  UInt64 numNodes = 0, numEdges = 0;
+  UInt64  numNodes = 0, numEdges = 0;
   FILE   *fp_outputFile = NULL;
+  UInt    smallestNodeID;
 
-  const char *pGraphFile = "test_graph_edgeList.txt";
+  const char *pGraphFile = "/home/newton/bigGraph/sorted_Wiki-Vote.txt";
   const char *pstrResultFile = "./resultsFile.txt";
 
   if ((fp_outputFile = fopen(pstrResultFile, "w")) == NULL)
@@ -254,9 +331,11 @@ int main(void)
       exit(1);
   }
 
-  findNumberOfEdgesAndNodesInFile(pGraphFile, &numNodes, &numEdges, fp_outputFile);
+  findNumberOfEdgesAndNodesInFile(pGraphFile, &numNodes, &numEdges,
+                                  fp_outputFile, &smallestNodeID);
 	Graph g(numNodes);
 
   addEdgesToGraph(&g, pGraphFile, &numNodes, &numEdges, fp_outputFile);
-  cout << g.countNotReach(0) << "\n";
+
+  g.accountForUnconnectedVertices(smallestNodeID);
 }
