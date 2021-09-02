@@ -12,6 +12,12 @@
 
 using namespace std;
 
+
+typedef unsigned int        UInt;
+typedef unsigned long int   UInt64;
+typedef int                 Int;
+typedef unsigned char       UInt8;
+
 // Graph class represents a directed graph
 // using adjacency list representation
 class Graph {
@@ -30,6 +36,7 @@ class Graph {
 
 	bool* visited;
 
+	int *newIDarray;
 
 public:
 	Graph(int V); // Constructor
@@ -42,13 +49,25 @@ public:
 	int countUnReachableVertices(int v);
 
 	int accountForUnconnectedVertices(int v);
+
+	int dumpModifiedGraphToFile(const char *filename);
 };
+
+
+void traverseGraph(const char *filename,
+                   UInt64 *pNumNodes,
+                   UInt64 *pNumEdges,
+                   FILE *fp_outputFile,
+                   UInt8 addEdge,
+                   Graph *g,
+                   UInt *pSmallestVertexID);
 
 Graph::Graph(int V)
 {
 	this->V = V;
 	adj = new list<int>[V];
 	visited = new bool[V];
+	newIDarray = new int[V];
 }
 
 void Graph::addEdge(int v, int w)
@@ -101,10 +120,81 @@ int Graph::countUnReachableVertices(int v)
 }
 /* Taken from GeeksForGeeks END */
 
-typedef unsigned int        UInt;
-typedef unsigned long int   UInt64;
-typedef int                 Int;
-typedef unsigned char       UInt8;
+int addEdgesToGraph(Graph *g, const char *filename, UInt64 *pNumNodes,
+                    UInt64 *pNumEdges, FILE *fp_outputFile)
+{
+  UInt64 numNodes = 0, numEdges = 0;
+  UInt   smallestNodeID;
+  traverseGraph(filename, &numNodes, &numEdges, fp_outputFile, 1, g, &smallestNodeID);
+}
+
+/* The aim is to form another graph which has only connected vertices of the graph */
+int Graph::accountForUnconnectedVertices(int smallestNodeID)
+{
+  /* Find the number of unconnected vertices */
+  int numUnconnectedVertices = countUnReachableVertices(smallestNodeID);
+  cout << "smallestNodeID: " << smallestNodeID << " Unconnected Nodes: "\
+<< numUnconnectedVertices << "\n";
+
+  int unconnected = -1;
+  for (int i = 0; i < V; i++)
+  {
+	  if (visited[i] == true)
+	  {
+      //printf("vertexID old:%d new:%d unconnected:%d\n", i, i - unconnected, unconnected);
+      newIDarray[i] = i - unconnected;
+	  }
+	  else
+	  {
+	    unconnected++;
+
+	    /* for unconnected vertex, ID is -1 */
+	    newIDarray[i] = -1;
+	  }
+	}
+
+  for (int i = 0; i < V; i++)
+  {
+	  printf("oldID:%d newID:%d\n", i, newIDarray[i]);
+  }
+}
+
+int Graph::dumpModifiedGraphToFile(const char *filename)
+{
+    FILE *fp;
+    FILE *fp_modifiedFile;
+    int fromnode = 0, tonode = 0;
+    int newFromnode = 0;
+    int newTonode = 0;
+
+    UInt8 zeroNodeExists = 0;
+
+    if ((fp = fopen(filename,"r")) == NULL)
+    {
+        fprintf(stderr,"[Error] Cannot open the file:%s\n", filename);
+        exit(1);
+    }
+
+    fp_modifiedFile = fopen("modifiedGraph.txt","w");
+
+    char str[500];
+    while(NULL != fgets(str, 500-1, fp))
+    {
+        /* some graphs have their node information wrongly written e.g.
+         * in Wiki-Vote.txt, the number of nodes mentioned is 7115, but there
+         * is a node with entry 7478 and there are other nodes also, so its
+         * better to find the number of nodes and edges in the file by parsing
+         * its once.
+         * The nodeID starts from zero, so number of nodes need adjustment.
+         */
+        sscanf(str,"%d%d", &fromnode, &tonode);
+        newFromnode = newIDarray[fromnode];
+        newTonode   = newIDarray[tonode];
+
+        if ((-1 != newFromnode) && (-1 != newTonode))
+        fprintf(fp_modifiedFile, "%d %d\n", newFromnode, newTonode);
+    }
+}
 
 /* Take a graph in edgelist format
  * count how many vertices are not there
@@ -275,54 +365,13 @@ void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
     fclose(fp);
 }
 
-int addEdgesToGraph(Graph *g, const char *filename, UInt64 *pNumNodes,
-                    UInt64 *pNumEdges, FILE *fp_outputFile)
-{
-  UInt64 numNodes = 0, numEdges = 0;
-  UInt   smallestNodeID;
-  traverseGraph(filename, &numNodes, &numEdges, fp_outputFile, 1, g, &smallestNodeID);
-}
-
-/* The aim is to form another graph which has only connected vertices of the graph */
-int Graph::accountForUnconnectedVertices(int smallestNodeID)
-{
-  /* Find the number of unconnected vertices */
-  int numUnconnectedVertices = countUnReachableVertices(smallestNodeID);
-  cout << "smallestNodeID: " << smallestNodeID << " Unconnected Nodes: "\
-<< numUnconnectedVertices << "\n";
-
-  int *newIDarray = new int[V];
-
-  int unconnected = -1;
-  for (int i = 0; i < V; i++)
-  {
-	  if (visited[i] == true)
-	  {
-      //printf("vertexID old:%d new:%d unconnected:%d\n", i, i - unconnected, unconnected);
-      newIDarray[i] = i - unconnected;
-	  }
-	  else
-	  {
-	    unconnected++;
-
-	    /* for unconnected vertex, ID is -1 */
-	    newIDarray[i] = -1;
-	  }
-	}
-
-  for (int i = 0; i < V; i++)
-  {
-	  printf("oldID:%d newID:%d\n", i, newIDarray[i]);
-  }
-}
-
 int main(void)
 {
   UInt64  numNodes = 0, numEdges = 0;
   FILE   *fp_outputFile = NULL;
   UInt    smallestNodeID;
 
-  const char *pGraphFile = "/home/newton/bigGraph/sorted_Wiki-Vote.txt";
+  const char *pGraphFile = "test_graph_edgeList.txt";
   const char *pstrResultFile = "./resultsFile.txt";
 
   if ((fp_outputFile = fopen(pstrResultFile, "w")) == NULL)
@@ -338,4 +387,6 @@ int main(void)
   addEdgesToGraph(&g, pGraphFile, &numNodes, &numEdges, fp_outputFile);
 
   g.accountForUnconnectedVertices(smallestNodeID);
+
+  g.dumpModifiedGraphToFile(pGraphFile);
 }
