@@ -52,7 +52,7 @@ public:
 
 	int accountForUnconnectedVertices(int v);
 
-	int dumpModifiedGraphToFile(const char *filename);
+	int dumpModifiedGraphToFile(const char *filename1, const char *filename2);
 };
 
 
@@ -161,7 +161,7 @@ int Graph::accountForUnconnectedVertices(int smallestNodeID)
   }
 }
 
-int Graph::dumpModifiedGraphToFile(const char *filename)
+int Graph::dumpModifiedGraphToFile(const char *ipFilename, const char *outFilename)
 {
     FILE *fp;
     FILE *fp_modifiedFile;
@@ -172,14 +172,26 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
 
     UInt8 zeroNodeExists = 0;
 
-    if ((fp = fopen(filename,"r")) == NULL)
+    if ((fp = fopen(ipFilename,"r")) == NULL)
     {
-        fprintf(stderr,"[Error] Cannot open the file:%s\n", filename);
+        fprintf(stderr,"[Error] Cannot open the file:%s\n", ipFilename);
         exit(1);
     }
 
-
+    char ch;
     char str[500];
+
+    /* Reading the File and skip the lines staring with # */
+    ch = getc(fp);
+
+    /* if its a comment ignore it and move forward */
+    while(ch == '#')
+    {
+        fgets(str, 500 - 1, fp);
+        ch = getc(fp);
+    }
+
+    ungetc(ch, fp);
 
     /* read the file to find the number of edges */
     while(NULL != fgets(str, 500-1, fp))
@@ -195,9 +207,19 @@ int Graph::dumpModifiedGraphToFile(const char *filename)
     /* restart reading the file, now we will write the modified file */
     fseek(fp, 0, SEEK_SET);
 
-    fp_modifiedFile = fopen("modifiedGraph.txt","w");
+    fp_modifiedFile = fopen(outFilename, "w");
     fprintf(fp_modifiedFile, "%s%d %d\n",
            "#", V- numUnconnectedVertices, edge);
+
+    ch = getc(fp);
+    /* if its a comment ignore it and move forward */
+    while(ch == '#')
+    {
+        fgets(str, 500 - 1, fp);
+        ch = getc(fp);
+    }
+
+    ungetc(ch, fp);
 
     while(NULL != fgets(str, 500-1, fp))
     {
@@ -383,13 +405,14 @@ void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
     fclose(fp);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
   UInt64  numNodes = 0, numEdges = 0;
   FILE   *fp_outputFile = NULL;
   UInt    smallestNodeID;
 
-  const char *pGraphFile = "test_graph_edgeList.txt";
+  const char *pinGraphFile  = argv[1];
+  const char *poutGraphFile = argv[2];
   const char *pstrResultFile = "./resultsFile.txt";
 
   if ((fp_outputFile = fopen(pstrResultFile, "w")) == NULL)
@@ -398,13 +421,13 @@ int main(void)
       exit(1);
   }
 
-  findNumberOfEdgesAndNodesInFile(pGraphFile, &numNodes, &numEdges,
+  findNumberOfEdgesAndNodesInFile(pinGraphFile, &numNodes, &numEdges,
                                   fp_outputFile, &smallestNodeID);
 	Graph g(numNodes);
 
-  addEdgesToGraph(&g, pGraphFile, &numNodes, &numEdges, fp_outputFile);
+  addEdgesToGraph(&g, pinGraphFile, &numNodes, &numEdges, fp_outputFile);
 
   g.accountForUnconnectedVertices(smallestNodeID);
 
-  g.dumpModifiedGraphToFile(pGraphFile);
+  g.dumpModifiedGraphToFile(pinGraphFile, poutGraphFile);
 }
