@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <sys/resource.h>
 
 #include "test.h"
 /* Taken from geeksforgeeks BEGIN
@@ -155,10 +156,12 @@ int Graph::accountForUnconnectedVertices(int smallestNodeID)
 	  }
 	}
 
+#if 0
   for (int i = 0; i < V; i++)
   {
 	  printf("oldID:%d newID:%d\n", i, newIDarray[i]);
   }
+#endif  
 }
 
 int Graph::dumpModifiedGraphToFile(const char *ipFilename, const char *outFilename)
@@ -279,6 +282,7 @@ void traverseGraph(const char *filename,
 
         if (addEdge && (g != NULL))
         {
+          printf("adding edge from:%d to:%d\n", fromnode, tonode);
           g->addEdge(fromnode, tonode);
         }
 
@@ -405,6 +409,30 @@ void findNumberOfEdgesAndNodesInFile(const char *filename, UInt64 *pNumNodes,
     fclose(fp);
 }
 
+
+void changeStackSize(void)
+{
+    const rlim_t kStackSize = 33L * 1024L * 1024L;   // min stack size = 64 Mb
+    struct rlimit rl;
+    int result;
+
+    result = getrlimit(RLIMIT_STACK, &rl);
+    printf("Stack size=> current:%lu new:%lu\n", rl.rlim_cur, kStackSize);
+
+    if (result == 0)
+    {
+        if (rl.rlim_cur < kStackSize)
+        {
+            rl.rlim_cur = kStackSize;
+            result = setrlimit(RLIMIT_STACK, &rl);
+            if (result != 0)
+            {
+                fprintf(stderr, "setrlimit returned result = %d\n", result);
+            }
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
   UInt64  numNodes = 0, numEdges = 0;
@@ -415,6 +443,7 @@ int main(int argc, char *argv[])
   const char *poutGraphFile = argv[2];
   const char *pstrResultFile = "./resultsFile.txt";
 
+  changeStackSize();
   if ((fp_outputFile = fopen(pstrResultFile, "w")) == NULL)
   {
       printf("[Error] Cannot open the file:%s", pstrResultFile);
